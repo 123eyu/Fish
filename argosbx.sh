@@ -78,7 +78,7 @@ v4dq=$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k https://ip.fm | sed -E
 v6dq=$( (command -v curl >/dev/null 2>&1 && curl -s6m5 -k https://ip.fm | sed -E 's/.*Location: ([^,]+(, [^,]+)*),.*/\1/' 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 --tries=2 -qO- https://ip.fm | grep '<span class="has-text-grey-light">Location:' | tail -n1 | sed -E 's/.*>Location: <\/span>([^<]+)<.*/\1/' 2>/dev/null) )
 }
 warpsx(){
-warpurl=$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k https://ygkkk-warp.renky.eu.org 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -4 --tries=2 -qO- https://ygkkk-warp.renky.eu.org 2>/dev/null) )
+warpurl=$( (command -v curl >/dev/null 2>&1 && curl -sm5 -k https://ygkkk-warp.renky.eu.org 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget --tries=2 -qO- https://ygkkk-warp.renky.eu.org 2>/dev/null) )
 if echo "$warpurl" | grep -q ygkkk; then
 pvk=$(echo "$warpurl" | awk -F'：' '/Private_key/{print $2}' | xargs)
 wpv6=$(echo "$warpurl" | awk -F'：' '/IPV6/{print $2}' | xargs)
@@ -122,16 +122,26 @@ xs6|s6x) s1outtag=warp-out; s2outtag=direct; x1outtag=warp-out; x2outtag=warp-ou
 esac
 fi
 fi
-case "$warp" in *x4*) wxryx='ForceIPv4' ;; *x6*) wxryx='ForceIPv6' ;; *) wxryx='ForceIPv4v6' ;; esac
-if (command -v curl >/dev/null 2>&1 && curl -s6m5 -k "$v46url" >/dev/null 2>&1) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 --tries=2 -qO- "$v46url" >/dev/null 2>&1); then
-xryx='ForceIPv6v4'; sbyx='prefer_ipv6'
-else
-case "$warp" in *x4*) xryx='ForceIPv4' ;; esac
-case "$warp" in *x6*) xryx='ForceIPv6v4' ;; esac
-case "$warp" in *s4*) sbyx='ipv4_only' ;; esac
-case "$warp" in *s6*) sbyx='prefer_ipv6' ;; esac
-[ -z "$xryx" ] && xryx='ForceIPv4v6'
-[ -z "$sbyx" ] && sbyx='prefer_ipv4'
+case "$warp" in *x4*) wxryx='ForceIPv4' ;; *x6*) wxryx='ForceIPv6' ;; *) wxryx='ForceIPv6v4' ;; esac
+if command -v curl >/dev/null 2>&1; then
+curl -s4m5 -k "$v46url" >/dev/null 2>&1 && v4_ok=true
+elif command -v wget >/dev/null 2>&1; then
+timeout 3 wget -4 --tries=2 -qO- "$v46url" >/dev/null 2>&1 && v4_ok=true
+fi
+if command -v curl >/dev/null 2>&1; then
+curl -s6m5 -k "$v46url" >/dev/null 2>&1 && v6_ok=true
+elif command -v wget >/dev/null 2>&1; then
+timeout 3 wget -6 --tries=2 -qO- "$v46url" >/dev/null 2>&1 && v6_ok=true
+fi
+if [ "$v4_ok" = true ] && [ "$v6_ok" = true ]; then
+case "$warp" in *s4*) sbyx='prefer_ipv4' ;; *) sbyx='prefer_ipv6' ;; esac
+case "$warp" in *x4*) xryx='ForceIPv4v6' ;; *x*) xryx='ForceIPv6v4' ;; *) xryx='ForceIPv4v6' ;; esac
+elif [ "$v4_ok" = true ] && [ "$v6_ok" != true ]; then
+case "$warp" in *s4*) sbyx='ipv4_only' ;; *) sbyx='prefer_ipv6' ;; esac
+case "$warp" in *x4*) xryx='ForceIPv4' ;; *x*) xryx='ForceIPv6v4' ;; *) xryx='ForceIPv4v6' ;; esac
+elif [ "$v4_ok" != true ] && [ "$v6_ok" = true ]; then
+case "$warp" in *s6*) sbyx='ipv6_only' ;; *) sbyx='prefer_ipv4' ;; esac
+case "$warp" in *x6*) xryx='ForceIPv6' ;; *x*) xryx='ForceIPv4v6' ;; *) xryx='ForceIPv6v4' ;; esac
 fi
 }
 upxray(){
@@ -172,11 +182,6 @@ cat > "$HOME/agsbx/xr.json" <<EOF
   "log": {
   "loglevel": "none"
   },
-  "dns": {
-    "servers": [
-      "${xsdns}"
-      ]
-   },
   "inbounds": [
 EOF
 insuuid
@@ -897,15 +902,6 @@ cat >> "$HOME/agsbx/sb.json" <<EOF
       }
     ],
     "final": "${s2outtag}"
-  },
-    "dns": {
-    "servers": [
-      {
-        "type": "https",
-        "server": "${xsdns}"
-      }
-    ],
-    "strategy": "${sbdnsyx}"
   }
 }
 EOF
@@ -1040,6 +1036,7 @@ else
 echo "Argo$argoname隧道申请失败，请稍后再试"
 fi
 fi
+sleep 5
 echo
 if find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -Eq 'agsbx/(s|x)' || pgrep -f 'agsbx/(s|x)' >/dev/null 2>&1 ; then
 [ -f ~/.bashrc ] || touch ~/.bashrc
@@ -1366,12 +1363,9 @@ echo "========================================================="
 echo "相关快捷方式如下：(首次安装成功后需重连SSH，agsbx快捷方式才可生效)"
 showmode
 }
-killargosbx(){
+cleandel(){
 for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsbx/c|/agsbx/s|/agsbx/x'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null; fi; fi; done
 kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) $(pgrep -f 'agsbx/c' 2>/dev/null) $(pgrep -f 'agsbx/x' 2>/dev/null) >/dev/null 2>&1
-}
-cleandel(){
-killargosbx
 sed -i '/agsbx/d' ~/.bashrc
 sed -i '/export PATH="\$HOME\/bin:\$PATH"/d' ~/.bashrc
 . ~/.bashrc 2>/dev/null
@@ -1396,29 +1390,27 @@ done
 rm -rf /etc/init.d/{sing-box,xray,argo}
 fi
 }
-sbxrestart(){
+xrestart(){
+kill -15 $(pgrep -f 'agsbx/x' 2>/dev/null) >/dev/null 2>&1
 if pidof systemd >/dev/null 2>&1; then
-for svc in sb xr argo; do
-systemctl restart "$svc" >/dev/null 2>&1
-done
+systemctl restart xr >/dev/null 2>&1
 elif command -v rc-service >/dev/null 2>&1; then
-for svc in sing-box xray argo; do
-rc-service "$svc" restart >/dev/null 2>&1
-done
+rc-service xray restart >/dev/null 2>&1
 else
-nohup $HOME/agsbx/sing-box run -c $HOME/agsbx/sb.json >/dev/null 2>&1 &
 nohup $HOME/agsbx/xray run -c $HOME/agsbx/xr.json >/dev/null 2>&1 &
 fi
-if [ -e "$HOME/agsbx/sbargotoken.log" ]; then
-if ! pidof systemd >/dev/null 2>&1 && ! command -v rc-service >/dev/null 2>&1; then
-nohup $HOME/agsbx/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token $(cat $HOME/agsbx/sbargotoken.log 2>/dev/null) >/dev/null 2>&1 &
-fi
-else
-nohup $HOME/agsbx/cloudflared tunnel --url http://localhost:$(cat $HOME/agsbx/argoport.log 2>/dev/null) --edge-ip-version auto --no-autoupdate --protocol http2 > $HOME/agsbx/argo.log 2>&1 &
-fi
-sleep 8
-echo "重启完成"
 }
+sbrestart(){
+kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) >/dev/null 2>&1
+if pidof systemd >/dev/null 2>&1; then
+systemctl restart sb >/dev/null 2>&1
+elif command -v rc-service >/dev/null 2>&1; then
+rc-service sing-box restart >/dev/null 2>&1
+else
+nohup $HOME/agsbx/sing-box run -c $HOME/agsbx/sb.json >/dev/null 2>&1 &
+fi
+}
+
 if [ "$1" = "del" ]; then
 cleandel
 rm -rf "$HOME/agsbx" "$HOME/agsb"
@@ -1436,37 +1428,63 @@ elif [ "$1" = "list" ]; then
 cip
 exit
 elif [ "$1" = "upx" ]; then
-killargosbx ; upxray ; sbxrestart ; cip
-echo "Xray内核更新完成"
+for P in /proc/[0-9]*; do [ -L "$P/exe" ] || continue; TARGET=$(readlink -f "$P/exe" 2>/dev/null) || continue; case "$TARGET" in *"/agsbx/x"*) kill "$(basename "$P")" 2>/dev/null ;; esac; done
+kill -15 $(pgrep -f 'agsbx/x' 2>/dev/null) >/dev/null 2>&1
+upxray && xrestart && echo "Xray内核更新完成" && sleep 2 && cip
 exit
 elif [ "$1" = "ups" ]; then
-killargosbx ; upsingbox ; sbxrestart ; cip
-echo "Sing-box内核更新完成"
+for P in /proc/[0-9]*; do [ -L "$P/exe" ] || continue; TARGET=$(readlink -f "$P/exe" 2>/dev/null) || continue; case "$TARGET" in *"/agsbx/s"*) kill "$(basename "$P")" 2>/dev/null ;; esac; done
+kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) >/dev/null 2>&1
+upsingbox && sbrestart && echo "Sing-box内核更新完成" && sleep 2 && cip
 exit
 elif [ "$1" = "res" ]; then
-killargosbx ; sbxrestart ; cip
+for P in /proc/[0-9]*; do
+[ -L "$P/exe" ] || continue
+TARGET=$(readlink -f "$P/exe" 2>/dev/null) || continue
+case "$TARGET" in
+*"/agsbx/s"*)
+kill "$(basename "$P")" 2>/dev/null
+sbrestart
+;;
+*"/agsbx/x"*)
+kill "$(basename "$P")" 2>/dev/null
+xrestart
+;;
+*"/agsbx/c"*)
+kill "$(basename "$P")" 2>/dev/null
+kill -15 $(pgrep -f 'agsbx/c' 2>/dev/null) >/dev/null 2>&1
+if pidof systemd >/dev/null 2>&1; then
+systemctl restart argo >/dev/null 2>&1
+elif command -v rc-service >/dev/null 2>&1; then
+rc-service argo restart >/dev/null 2>&1
+else
+if [ -e "$HOME/agsbx/sbargotoken.log" ]; then
+if ! pidof systemd >/dev/null 2>&1 && ! command -v rc-service >/dev/null 2>&1; then
+nohup $HOME/agsbx/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token $(cat $HOME/agsbx/sbargotoken.log 2>/dev/null) >/dev/null 2>&1 &
+fi
+else
+nohup $HOME/agsbx/cloudflared tunnel --url http://localhost:$(cat $HOME/agsbx/argoport.log 2>/dev/null) --edge-ip-version auto --no-autoupdate --protocol http2 > $HOME/agsbx/argo.log 2>&1 &
+fi
+fi
+;;
+esac
+done
+sleep 5 && echo "重启完成" && sleep 3 && cip
 exit
 fi
 if ! find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -Eq 'agsbx/(s|x)' && ! pgrep -f 'agsbx/(s|x)' >/dev/null 2>&1; then
 for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsbx/c|/agsbx/s|/agsbx/x'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null && echo "Killed $PID ($TARGET)" || echo "Could not kill $PID ($TARGET)"; fi; fi; done
 kill -15 $(pgrep -f 'agsbx/s' 2>/dev/null) $(pgrep -f 'agsbx/c' 2>/dev/null) $(pgrep -f 'agsbx/x' 2>/dev/null) >/dev/null 2>&1
-v4orv6(){
 if [ -z "$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k "$v46url" 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -4 -qO- --tries=2 "$v46url" 2>/dev/null) )" ]; then
 echo -e "nameserver 2a00:1098:2b::1\nnameserver 2a00:1098:2c::1" > /etc/resolv.conf
 fi
 if [ -n "$( (command -v curl >/dev/null 2>&1 && curl -s6m5 -k "$v46url" 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 -qO- --tries=2 "$v46url" 2>/dev/null) )" ]; then
 sendip="2606:4700:d0::a29f:c001"
 xendip="[2606:4700:d0::a29f:c001]"
-xsdns="[2001:4860:4860::8888]"
-sbdnsyx="ipv6_only"
 else
 sendip="162.159.192.1"
 xendip="162.159.192.1"
-xsdns="8.8.8.8"
-sbdnsyx="ipv4_only"
 fi
-}
-v4orv6
 echo "VPS系统：$op"
 echo "CPU架构：$cpu"
 echo "Argosbx脚本未安装，开始安装…………" && sleep 1

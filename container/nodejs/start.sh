@@ -49,7 +49,7 @@ v4dq=$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k https://ip.fm | sed -E
 v6dq=$( (command -v curl >/dev/null 2>&1 && curl -s6m5 -k https://ip.fm | sed -E 's/.*Location: ([^,]+(, [^,]+)*),.*/\1/' 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 --tries=2 -qO- https://ip.fm | grep '<span class="has-text-grey-light">Location:' | tail -n1 | sed -E 's/.*>Location: <\/span>([^<]+)<.*/\1/' 2>/dev/null) )
 }
 warpsx(){
-warpurl=$( (command -v curl >/dev/null 2>&1 && curl -s4m5 -k https://ygkkk-warp.renky.eu.org 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -4 --tries=2 -qO- https://ygkkk-warp.renky.eu.org 2>/dev/null) )
+warpurl=$( (command -v curl >/dev/null 2>&1 && curl -sm5 -k https://ygkkk-warp.renky.eu.org 2>/dev/null) || (command -v wget >/dev/null 2>&1 && timeout 3 wget --tries=2 -qO- https://ygkkk-warp.renky.eu.org 2>/dev/null) )
 if echo "$warpurl" | grep -q ygkkk; then
 pvk=$(echo "$warpurl" | awk -F'：' '/Private_key/{print $2}' | xargs)
 wpv6=$(echo "$warpurl" | awk -F'：' '/IPV6/{print $2}' | xargs)
@@ -93,16 +93,26 @@ xs6|s6x) s1outtag=warp-out; s2outtag=direct; x1outtag=warp-out; x2outtag=warp-ou
 esac
 fi
 fi
-case "$warp" in *x4*) wxryx='ForceIPv4' ;; *x6*) wxryx='ForceIPv6' ;; *) wxryx='ForceIPv4v6' ;; esac
-if (command -v curl >/dev/null 2>&1 && curl -s6m5 -k "$v46url" >/dev/null 2>&1) || (command -v wget >/dev/null 2>&1 && timeout 3 wget -6 --tries=2 -qO- "$v46url" >/dev/null 2>&1); then
-xryx='ForceIPv6v4'; sbyx='prefer_ipv6'
-else
-case "$warp" in *x4*) xryx='ForceIPv4' ;; esac
-case "$warp" in *x6*) xryx='ForceIPv6v4' ;; esac
-case "$warp" in *s4*) sbyx='ipv4_only' ;; esac
-case "$warp" in *s6*) sbyx='prefer_ipv6' ;; esac
-[ -z "$xryx" ] && xryx='ForceIPv4v6'
-[ -z "$sbyx" ] && sbyx='prefer_ipv4'
+case "$warp" in *x4*) wxryx='ForceIPv4' ;; *x6*) wxryx='ForceIPv6' ;; *) wxryx='ForceIPv6v4' ;; esac
+if command -v curl >/dev/null 2>&1; then
+curl -s4m5 -k "$v46url" >/dev/null 2>&1 && v4_ok=true
+elif command -v wget >/dev/null 2>&1; then
+timeout 3 wget -4 --tries=2 -qO- "$v46url" >/dev/null 2>&1 && v4_ok=true
+fi
+if command -v curl >/dev/null 2>&1; then
+curl -s6m5 -k "$v46url" >/dev/null 2>&1 && v6_ok=true
+elif command -v wget >/dev/null 2>&1; then
+timeout 3 wget -6 --tries=2 -qO- "$v46url" >/dev/null 2>&1 && v6_ok=true
+fi
+if [ "$v4_ok" = true ] && [ "$v6_ok" = true ]; then
+case "$warp" in *s4*) sbyx='prefer_ipv4' ;; *) sbyx='prefer_ipv6' ;; esac
+case "$warp" in *x4*) xryx='ForceIPv4v6' ;; *x*) xryx='ForceIPv6v4' ;; *) xryx='ForceIPv4v6' ;; esac
+elif [ "$v4_ok" = true ] && [ "$v6_ok" != true ]; then
+case "$warp" in *s4*) sbyx='ipv4_only' ;; *) sbyx='prefer_ipv6' ;; esac
+case "$warp" in *x4*) xryx='ForceIPv4' ;; *x*) xryx='ForceIPv6v4' ;; *) xryx='ForceIPv4v6' ;; esac
+elif [ "$v4_ok" != true ] && [ "$v6_ok" = true ]; then
+case "$warp" in *s6*) sbyx='ipv6_only' ;; *) sbyx='prefer_ipv4' ;; esac
+case "$warp" in *x6*) xryx='ForceIPv6' ;; *x*) xryx='ForceIPv4v6' ;; *) xryx='ForceIPv6v4' ;; esac
 fi
 }
 
@@ -828,8 +838,6 @@ xrsbso
 warpsx
 xrsbout
 fi
-
-
 if [ -n "$argo" ]; then
 echo
 echo "=========启用Cloudflared-argo内核========="
@@ -861,6 +869,7 @@ echo "Argo$argoname隧道申请成功"
 else
 echo "Argo$argoname隧道申请失败，请稍后再试"
 fi
+sleep 5
 if find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -Eq 'agsbx/(s|x)' || pgrep -f 'agsbx/(s|x)' >/dev/null 2>&1 ; then
 echo "Argosbx脚本进程启动成功，安装完毕" && sleep 2
 else
